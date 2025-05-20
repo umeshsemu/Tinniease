@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Binaural Phase-Controlled Tinnitus Generator</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f0f0;
+      margin: 20px;
+    }
+    h1 {
+      text-align: center;
+    }
+    .container {
+      max-width: 600px;
+      background: #fff;
+      margin: auto;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    label {
+      display: block;
+      margin-top: 15px;
+      font-weight: bold;
+    }
+    input[type=range] {
+      width: 100%;
+    }
+    .waveform-buttons button {
+      margin-right: 5px;
+      padding: 5px 10px;
+    }
+    .waveform-buttons .active {
+      background: #007BFF;
+      color: white;
+    }
+    #playButton {
+      margin-top: 20px;
+      padding: 10px;
+      width: 100%;
+      font-size: 16px;
+      background: #28a745;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    canvas {
+      margin-top: 20px;
+      width: 100%;
+      height: 100px;
+      background: #fff;
+      border: 1px solid #ccc;
+    }
+  </style>
+</head>
+<body>
+  <h1>Binaural Phase-Controlled Tinnitus Generator</h1>
+  <div class="container">
+    <label>Frequency: <span id="freqVal">1000</span> Hz</label>
+    <input type="range" id="frequency" min="20" max="20000" value="1000" step="1">
+
+    <label>Left Phase: <span id="leftPhaseVal">0</span>°</label>
+    <input type="range" id="leftPhase" min="0" max="360" value="0" step="1">
+
+    <label>Right Phase: <span id="rightPhaseVal">0</span>°</label>
+    <input type="range" id="rightPhase" min="0" max="360" value="0" step="1">
+
+    <label>Waveform:</label>
+    <div class="waveform-buttons">
+      <button class="waveform-btn active" data-waveform="sine">Sine</button>
+      <button class="waveform-btn" data-waveform="square">Square</button>
+      <button class="waveform-btn" data-waveform="sawtooth">Saw</button>
+    </div>
+
+    <canvas id="waveCanvas"></canvas>
+    <button id="playButton">Play</button>
+  </div>
+
+  <script>
+    class BinauralPhaseGenerator {
+      constructor() {
+        this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        this.freq = 1000;
+        this.leftPhase = 0;
+        this.rightPhase = 0;
+        this.waveform = 'sine';
+        this.isPlaying = false;
+
+        this.initElements();
+        this.addListeners();
+        this.setupCanvas();
+        this.drawWave();
+      }
+
+      initElements() {
+        this.freqSlider = document.getElementById('frequency');
+        this.freqVal = document.getElementById('freqVal');
+        this.leftPhaseSlider = document.getElementById('leftPhase');
+        this.leftPhaseVal = document.getElementById('leftPhaseVal');
+        this.rightPhaseSlider = document.getElementById('rightPhase');
+        this.rightPhaseVal = document.getElementById('rightPhaseVal');
+        this.waveBtns = document.querySelectorAll('.waveform-btn');
+        this.playBtn = document.getElementById('playButton');
+        this.canvas = document.getElementById('waveCanvas');
+        this.ctx = this.canvas.getContext('2d');
+      }
+
+      addListeners() {
+        this.freqSlider.oninput = () => {
+          this.freq = +this.freqSlider.value;
+          this.freqVal.textContent = this.freq;
+          this.updateOscillators();
+          this.drawWave();
+        };
+        this.leftPhaseSlider.oninput = () => {
+          this.leftPhase = +this.leftPhaseSlider.value;
+          this.leftPhaseVal.textContent = this.leftPhase;
+          this.drawWave();
+        };
+        this.rightPhaseSlider.oninput = () => {
+          this.rightPhase = +this.rightPhaseSlider.value;
+          this.rightPhaseVal.textContent = this.rightPhase;
+          this.drawWave();
+        };
+        this.waveBtns.forEach(btn => {
+          btn.onclick = () => {
+            this.waveform = btn.dataset.waveform;
+            this.waveBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            this.updateOscillators();
+            this.drawWave();
+          };
+        });
+        this.playBtn.onclick = () => this.togglePlayback();
+        window.addEventListener('resize', () => {
+          this.setupCanvas();
+          this.drawWave();
+        });
+      }
+
+      setupCanvas() {
+        this.canvas.width = this.canvas.offsetWidth;
+        this.canvas.height = this.canvas.offsetHeight;
+      }
+
+      createOscillator(frequency, phaseDeg, panValue) {
+        const offset = phaseDeg / 360 / frequency;
+        const osc = this.audioCtx.createOscillator();
+        const panner = this.audioCtx.createStereoPanner();
+        const gain = this.audioCtx.createGain();
+
+        osc.type = this.waveform;
+        osc.frequency.setValueAtTime(frequency, this.audioCtx.currentTime);
+        panner.pan.value = panValue;
+
+        osc.connect(gain).connect(panner).connect(this.audioCtx.destination);
+        osc.start(this.audioCtx.currentTime + offset);
+        return osc;
+      }
+
+      togglePlayback() {
+        if (this.isPlaying) {
+          this.stop();
+        } else {
+          this.play();
+        }
+      }
+
+      play() {
+        this.leftOsc = this.createOscillator(this.freq, this.leftPhase, -1);
+        this.rightOsc = this.createOscillator(this.freq, this.rightPhase, 1);
+        this.isPlaying = true;
+        this.playBtn.textContent = 'Stop';
+      }
+
+      stop() {
+        if (this.leftOsc) {
+          this.leftOsc.stop();
+          this.leftOsc.disconnect();
+          this.leftOsc = null;
+        }
+        if (this.rightOsc) {
+          this.rightOsc.stop();
+          this.rightOsc.disconnect();
+          this.rightOsc = null;
+        }
+        this.isPlaying = false;
+        this.playBtn.textContent = 'Play';
+      }
+
+      updateOscillators() {
+        if (this.isPlaying) {
+          this.stop();
+          this.play();
+        }
+      }
+
+      drawWave() {
+        const ctx = this.ctx;
+        const w = ctx.canvas.width;
+        const h = ctx.canvas.height;
+        ctx.clearRect(0, 0, w, h);
+        ctx.beginPath();
+        for (let x = 0; x < w; x++) {
+          const t = x / w;
+          const angleL = 2 * Math.PI * this.freq * t + this.leftPhase * Math.PI / 180;
+          const angleR = 2 * Math.PI * this.freq * t + this.rightPhase * Math.PI / 180;
+          const y = (Math.sin(angleL) + Math.sin(angleR)) / 2;
+          const yPx = h / 2 - y * h / 2;
+          x === 0 ? ctx.moveTo(x, yPx) : ctx.lineTo(x, yPx);
+        }
+        ctx.strokeStyle = '#007BFF';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+    }
+
+    new BinauralPhaseGenerator();
+  </script>
+</body>
+</html>

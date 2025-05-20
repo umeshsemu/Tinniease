@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Binaural Tinnitus Generator</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background: #f4f6f8;
+    }
+    h1 {
+      text-align: center;
+    }
+    .container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 30px;
+    }
+    .channel {
+      background: #fff;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      width: 300px;
+    }
+    canvas {
+      width: 100%;
+      height: 100px;
+      margin-top: 10px;
+      background: #fff;
+      border: 1px solid #ccc;
+    }
+    .controls {
+      margin-top: 10px;
+    }
+    .controls label {
+      display: block;
+      margin-bottom: 5px;
+    }
+    .controls input[type="range"] {
+      width: 100%;
+    }
+    .waveform-buttons button {
+      margin-right: 5px;
+      padding: 5px 10px;
+    }
+    .waveform-buttons .active {
+      background: #3498db;
+      color: white;
+    }
+    #playButton {
+      display: block;
+      margin: 20px auto;
+      padding: 10px 20px;
+      font-size: 16px;
+      background: #27ae60;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>Binaural Tinnitus Generator</h1>
+  <div class="container">
+    <div class="channel">
+      <h2>Left Ear</h2>
+      <div class="controls">
+        <label>Frequency: <span id="leftFrequencyValue">1000</span> Hz</label>
+        <input type="range" id="leftFrequency" min="20" max="20000" step="1" value="1000">
+        <label>Phase: <span id="leftPhaseValue">0</span>°</label>
+        <input type="range" id="leftPhase" min="0" max="360" step="1" value="0">
+        <div class="waveform-buttons">
+          <button class="waveform-btn active" data-ear="left" data-waveform="sine">Sine</button>
+          <button class="waveform-btn" data-ear="left" data-waveform="square">Square</button>
+          <button class="waveform-btn" data-ear="left" data-waveform="sawtooth">Saw</button>
+        </div>
+        <canvas id="leftWaveformCanvas"></canvas>
+      </div>
+    </div>
+
+    <div class="channel">
+      <h2>Right Ear</h2>
+      <div class="controls">
+        <label>Frequency: <span id="rightFrequencyValue">1000</span> Hz</label>
+        <input type="range" id="rightFrequency" min="20" max="20000" step="1" value="1000">
+        <label>Phase: <span id="rightPhaseValue">0</span>°</label>
+        <input type="range" id="rightPhase" min="0" max="360" step="1" value="0">
+        <div class="waveform-buttons">
+          <button class="waveform-btn active" data-ear="right" data-waveform="sine">Sine</button>
+          <button class="waveform-btn" data-ear="right" data-waveform="square">Square</button>
+          <button class="waveform-btn" data-ear="right" data-waveform="sawtooth">Saw</button>
+        </div>
+        <canvas id="rightWaveformCanvas"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <button id="playButton">Play</button>
+
+  <script>
+    class BinauralTinnitusGenerator {
+      constructor() {
+        this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        this.leftOscillator = null;
+        this.rightOscillator = null;
+        this.leftGainNode = this.audioContext.createGain();
+        this.rightGainNode = this.audioContext.createGain();
+        this.leftGainNode.gain.value = 0.5;
+        this.rightGainNode.gain.value = 0.5;
+        this.isPlaying = false;
+
+        this.leftConfig = { frequency: 1000, phase: 0, waveform: 'sine' };
+        this.rightConfig = { frequency: 1000, phase: 0, waveform: 'sine' };
+
+        this.initializeElements();
+        this.setupEventListeners();
+        this.setupCanvas();
+      }
+
+      initializeElements() {
+        this.leftFrequencySlider = document.getElementById('leftFrequency');
+        this.leftFrequencyValue = document.getElementById('leftFrequencyValue');
+        this.leftPhaseSlider = document.getElementById('leftPhase');
+        this.leftPhaseValue = document.getElementById('leftPhaseValue');
+        this.leftWaveformButtons = document.querySelectorAll('[data-ear="left"].waveform-btn');
+        this.leftCanvas = document.getElementById('leftWaveformCanvas');
+        this.leftCtx = this.leftCanvas.getContext('2d');
+
+        this.rightFrequencySlider = document.getElementById('rightFrequency');
+        this.rightFrequencyValue = document.getElementById('rightFrequencyValue');
+        this.rightPhaseSlider = document.getElementById('rightPhase');
+        this.rightPhaseValue = document.getElementById('rightPhaseValue');
+        this.rightWaveformButtons = document.querySelectorAll('[data-ear="right"].waveform-btn');
+        this.rightCanvas = document.getElementById('rightWaveformCanvas');
+        this.rightCtx = this.rightCanvas.getContext('2d');
+
+        this.playButton = document.getElementById('playButton');
+      }
+
+      setupEventListeners() {
+        this.leftFrequencySlider.addEventListener('input', () => {
+          this.leftConfig.frequency = +this.leftFrequencySlider.value;
+          this.leftFrequencyValue.textContent = this.leftConfig.frequency;
+          if (this.leftOscillator) {
+            this.leftOscillator.frequency.setValueAtTime(this.leftConfig.frequency, this.audioContext.currentTime);
+          }
+          this.drawLeftWaveform();
+        });
+
+        this.leftPhaseSlider.addEventListener('input', () => {
+          this.leftConfig.phase = +this.leftPhaseSlider.value;
+          this.leftPhaseValue.textContent = this.leftConfig.phase;
+          this.drawLeftWaveform();
+        });
+
+        this.leftWaveformButtons.forEach(btn => {
+          btn.addEventListener('click', () => {
+            this.leftConfig.waveform = btn.dataset.waveform;
+            if (this.leftOscillator) this.leftOscillator.type = this.leftConfig.waveform;
+            this.leftWaveformButtons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            this.drawLeftWaveform();
+          });
+        });
+
+        this.rightFrequencySlider.addEventListener('input', () => {
+          this.rightConfig.frequency = +this.rightFrequencySlider.value;
+          this.rightFrequencyValue.textContent = this.rightConfig.frequency;
+          if (this.rightOscillator) {
+            this.rightOscillator.frequency.setValueAtTime(this.rightConfig.frequency, this.audioContext.currentTime);
+          }
+          this.drawRightWaveform();
+        });
+
+        this.rightPhaseSlider.addEventListener('input', () => {
+          this.rightConfig.phase = +this.rightPhaseSlider.value;
+          this.rightPhaseValue.textContent = this.rightConfig.phase;
+          this.drawRightWaveform();
+        });
+
+        this.rightWaveformButtons.forEach(btn => {
+          btn.addEventListener('click', () => {
+            this.rightConfig.waveform = btn.dataset.waveform;
+            if (this.rightOscillator) this.rightOscillator.type = this.rightConfig.waveform;
+            this.rightWaveformButtons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            this.drawRightWaveform();
+          });
+        });
+
+        this.playButton.addEventListener('click', () => this.togglePlay());
+
+        window.addEventListener('resize', () => {
+          this.setupCanvas();
+          this.drawLeftWaveform();
+          this.drawRightWaveform();
+        });
+      }
+
+      setupCanvas() {
+        this.leftCanvas.width = this.leftCanvas.offsetWidth;
+        this.leftCanvas.height = this.leftCanvas.offsetHeight;
+        this.rightCanvas.width = this.rightCanvas.offsetWidth;
+        this.rightCanvas.height = this.rightCanvas.offsetHeight;
+      }
+
+      togglePlay() {
+        if (this.isPlaying) {
+          this.stop();
+        } else {
+          this.play();
+        }
+      }
+
+      play() {
+        const ctx = this.audioContext;
+
+        const createOscillator = (config, gainNode, panValue) => {
+          const osc = ctx.createOscillator();
+          const pan = ctx.createStereoPanner();
+          osc.type = config.waveform;
+          osc.frequency.value = config.frequency;
+          osc.connect(gainNode).connect(pan).connect(ctx.destination);
+          pan.pan.value = panValue;
+
+          const offset = config.phase / 360 * (1 / config.frequency);
+          osc.start(ctx.currentTime + offset);
+          return osc;
+        };
+
+        this.leftOscillator = createOscillator(this.leftConfig, this.leftGainNode, -1);
+        this.rightOscillator = createOscillator(this.rightConfig, this.rightGainNode, 1);
+
+        this.isPlaying = true;
+        this.playButton.textContent = 'Stop';
+      }
+
+      stop() {
+        if (this.leftOscillator) this.leftOscillator.stop();
+        if (this.rightOscillator) this.rightOscillator.stop();
+        this.leftOscillator = null;
+        this.rightOscillator = null;
+        this.isPlaying = false;
+        this.playButton.textContent = 'Play';
+      }
+
+      drawLeftWaveform() {
+        this.drawWaveform(this.leftCtx, this.leftConfig);
+      }
+
+      drawRightWaveform() {
+        this.drawWaveform(this.rightCtx, this.rightConfig);
+      }
+
+      drawWaveform(ctx, config) {
+        const width = ctx.canvas.width;
+        const height = ctx.canvas.height;
+        ctx.clearRect(0, 0, width, height);
+        ctx.beginPath();
+        for (let x = 0; x < width; x++) {
+          const t = x / width;
+          const angle = 2 * Math.PI * config.frequency * t + config.phase * Math.PI / 180;
+          const y = Math.sin(angle);
+          const yPixel = height / 2 - y * height / 2;
+          if (x === 0) ctx.moveTo(x, yPixel);
+          else ctx.lineTo(x, yPixel);
+        }
+        ctx.strokeStyle = "#3498db";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+    }
+
+    new BinauralTinnitusGenerator();
+  </script>
+</body>
+</html>
