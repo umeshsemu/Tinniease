@@ -57,20 +57,20 @@
   </style>
 </head>
 <body>
-  <h1>Mono Tinnitus Generator</h1>
+  <!-- <h1>Mono Tinnitus Generator</h1> -->
   <div class="container">
     <div class="controls">
-      <label>Output Ear:</label>
+      <label for="earSelect">Output Ear:</label>
       <select id="earSelect">
         <option value="left">Left Ear</option>
         <option value="right">Right Ear</option>
       </select>
 
       <label>Frequency: <span id="freqVal">1000</span> Hz</label>
-      <input type="range" id="frequency" min="20" max="20000" value="1000" step="1">
+      <input type="range" id="frequency" min="20" max="20000" value="1000" step="1" title="Frequency in Hertz">
 
       <label>Phase: <span id="phaseVal">0</span>°</label>
-      <input type="range" id="phase" min="0" max="360" value="0" step="1">
+      <input type="range" id="phase" min="0" max="360" value="0" step="1" title="Phase in degrees">
 
       <label>Waveform:</label>
       <div class="waveform-buttons">
