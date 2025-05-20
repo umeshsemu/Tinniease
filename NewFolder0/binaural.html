@@ -65,15 +65,15 @@
   </style>
 </head>
 <body>
-  <h1>Binaural Tinnitus Generator</h1>
+  <!-- <h1>Binaural Tinnitus Generator</h1> -->
   <div class="container">
     <div class="channel">
       <h2>Left Ear</h2>
       <div class="controls">
         <label>Frequency: <span id="leftFrequencyValue">1000</span> Hz</label>
-        <input type="range" id="leftFrequency" min="20" max="20000" step="1" value="1000">
+        <input type="range" id="leftFrequency" min="20" max="20000" step="1" value="1000" title="Left Ear Frequency">
         <label>Phase: <span id="leftPhaseValue">0</span>°</label>
-        <input type="range" id="leftPhase" min="0" max="360" step="1" value="0">
+        <input type="range" id="leftPhase" min="0" max="360" step="1" value="0" title="Left Ear Phase">
         <div class="waveform-buttons">
           <button class="waveform-btn active" data-ear="left" data-waveform="sine">Sine</button>
           <button class="waveform-btn" data-ear="left" data-waveform="square">Square</button>
@@ -87,9 +87,9 @@
       <h2>Right Ear</h2>
       <div class="controls">
         <label>Frequency: <span id="rightFrequencyValue">1000</span> Hz</label>
-        <input type="range" id="rightFrequency" min="20" max="20000" step="1" value="1000">
+        <input type="range" id="rightFrequency" min="20" max="20000" step="1" value="1000" title="Right Ear Frequency">
         <label>Phase: <span id="rightPhaseValue">0</span>°</label>
-        <input type="range" id="rightPhase" min="0" max="360" step="1" value="0">
+        <input type="range" id="rightPhase" min="0" max="360" step="1" value="0" title="Right Ear Phase">
         <div class="waveform-buttons">
           <button class="waveform-btn active" data-ear="right" data-waveform="sine">Sine</button>
           <button class="waveform-btn" data-ear="right" data-waveform="square">Square</button>
