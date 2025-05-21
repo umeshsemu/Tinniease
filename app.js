@@ -246,8 +246,8 @@ class TinnieaseApp {
       this.userData.name = message;
       this.addBotMessage(
         "Nice to meet you, " +
-          message +
-          "! What's your date of birth? (DD/MM/YYYY)"
+        message +
+        "! What's your date of birth? (DD/MM/YYYY)"
       );
     } else if (!this.userData.dateOfBirth) {
       this.userData.dateOfBirth = message;
@@ -444,7 +444,12 @@ class TinnieaseApp {
   }
 }
 
+
 // Initialize the app when the page loads
 window.addEventListener("load", () => {
   new TinnieaseApp();
+  
 });
+
+
+
