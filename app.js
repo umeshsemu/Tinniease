@@ -1,3 +1,5 @@
+import LLMService from './llmService.js';
+
 class TinnieaseApp {
   constructor() {
     this.audioContext = new (window.AudioContext ||
@@ -13,6 +15,7 @@ class TinnieaseApp {
       tinnitusType: null,
       affectedEar: null,
     };
+    this.llmService = new LLMService();
 
     this.createInitialUI();
     this.startConversation();
@@ -210,9 +213,8 @@ class TinnieaseApp {
   }
 
   async startConversation() {
-    this.addBotMessage(
-      "Welcome to Tinniease! Are you a new or existing user? (Type 'new' or 'existing')"
-    );
+    const initialMessage = "Hello! I'm here to help you with your tinnitus. Could you tell me about your experience with tinnitus?";
+    this.addBotMessage(initialMessage);
   }
 
   async handleUserInput() {
@@ -224,87 +226,23 @@ class TinnieaseApp {
     this.addUserMessage(message);
     userInput.value = "";
 
-    if (this.userData.isNewUser === null) {
-      if (message.toLowerCase() === "new") {
-        this.userData.isNewUser = true;
-        this.addBotMessage("Great! Let's get you set up. What's your name?");
-      } else if (message.toLowerCase() === "existing") {
-        this.userData.isNewUser = false;
-        this.addBotMessage("Welcome back! Please enter your phone number:");
-      } else {
-        this.addBotMessage("Please type 'new' or 'existing' to continue.");
-      }
-    } else if (this.userData.isNewUser) {
-      await this.handleNewUserFlow(message);
-    } else {
-      await this.handleExistingUserFlow(message);
-    }
-  }
+    // Get response from LLM
+    const response = await this.llmService.generateResponse(message);
+    this.addBotMessage(response);
 
-  async handleNewUserFlow(message) {
-    if (!this.userData.name) {
-      this.userData.name = message;
-      this.addBotMessage(
-        "Nice to meet you, " +
-        message +
-        "! What's your date of birth? (DD/MM/YYYY)"
-      );
-    } else if (!this.userData.dateOfBirth) {
-      this.userData.dateOfBirth = message;
-      this.addBotMessage("What's your phone number?");
-    } else if (!this.userData.phoneNumber) {
-      this.userData.phoneNumber = message;
-      this.addBotMessage(
-        "What type of tinnitus do you have?\n1. Bilateral Symmetric\n2. Bilateral Asymmetric\n3. Unilateral"
-      );
-    } else if (!this.userData.tinnitusType) {
-      const type = parseInt(message);
-      if (type >= 1 && type <= 3) {
-        this.userData.tinnitusType = type;
-        if (type === 3) {
-          this.addBotMessage("Which ear is affected? (Left/Right)");
-        } else {
-          this.loadTinnitusInterface(type);
-        }
+    // Check if we have enough information to determine tinnitus type
+    const tinnitusType = this.llmService.analyzeTinnitusType();
+    if (tinnitusType !== null && !this.userData.tinnitusType) {
+      this.userData.tinnitusType = tinnitusType;
+      
+      if (tinnitusType === 3) {
+        // For unilateral, we need to determine which ear
+        const earResponse = await this.llmService.generateResponse(
+          "Which ear is affected by your tinnitus? Please specify left or right."
+        );
+        this.addBotMessage(earResponse);
       } else {
-        this.addBotMessage("Please enter a number between 1 and 3.");
-      }
-    } else if (this.userData.tinnitusType === 3 && !this.userData.affectedEar) {
-      const ear = message.toLowerCase();
-      if (ear === "left" || ear === "right") {
-        this.userData.affectedEar = ear;
-        this.loadTinnitusInterface(3);
-      } else {
-        this.addBotMessage("Please enter 'Left' or 'Right'.");
-      }
-    }
-  }
-
-  async handleExistingUserFlow(message) {
-    if (!this.userData.phoneNumber) {
-      this.userData.phoneNumber = message;
-      this.addBotMessage(
-        "Welcome back! What type of tinnitus do you have?\n1. Bilateral Symmetric\n2. Bilateral Asymmetric\n3. Unilateral"
-      );
-    } else if (!this.userData.tinnitusType) {
-      const type = parseInt(message);
-      if (type >= 1 && type <= 3) {
-        this.userData.tinnitusType = type;
-        if (type === 3) {
-          this.addBotMessage("Which ear is affected? (Left/Right)");
-        } else {
-          this.loadTinnitusInterface(type);
-        }
-      } else {
-        this.addBotMessage("Please enter a number between 1 and 3.");
-      }
-    } else if (this.userData.tinnitusType === 3 && !this.userData.affectedEar) {
-      const ear = message.toLowerCase();
-      if (ear === "left" || ear === "right") {
-        this.userData.affectedEar = ear;
-        this.loadTinnitusInterface(3);
-      } else {
-        this.addBotMessage("Please enter 'Left' or 'Right'.");
+        this.loadTinnitusInterface(tinnitusType);
       }
     }
   }
@@ -337,10 +275,28 @@ class TinnieaseApp {
         const temp = document.createElement("div");
         temp.innerHTML = html;
 
-        // Append the new content
+        // Extract and execute scripts
+        const scripts = temp.getElementsByTagName("script");
+        const scriptsArray = Array.from(scripts);
+        
+        // Remove scripts from temp before appending content
+        scriptsArray.forEach(script => script.remove());
+        
+        // Append the HTML content first
         while (temp.firstChild) {
           mainContent.appendChild(temp.firstChild);
         }
+
+        // Execute each script
+        scriptsArray.forEach(script => {
+          const newScript = document.createElement("script");
+          if (script.src) {
+            newScript.src = script.src;
+          } else {
+            newScript.textContent = script.textContent;
+          }
+          document.body.appendChild(newScript);
+        });
 
         // Initialize any necessary event listeners or functionality
         this.initializeTinnitusInterface(type);
@@ -444,11 +400,9 @@ class TinnieaseApp {
   }
 }
 
-
 // Initialize the app when the page loads
 window.addEventListener("load", () => {
   new TinnieaseApp();
-  
 });
 
 
