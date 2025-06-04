@@ -337,10 +337,28 @@ class TinnieaseApp {
         const temp = document.createElement("div");
         temp.innerHTML = html;
 
-        // Append the new content
+        // Extract and execute scripts
+        const scripts = temp.getElementsByTagName("script");
+        const scriptsArray = Array.from(scripts);
+        
+        // Remove scripts from temp before appending content
+        scriptsArray.forEach(script => script.remove());
+        
+        // Append the HTML content first
         while (temp.firstChild) {
           mainContent.appendChild(temp.firstChild);
         }
+
+        // Execute each script
+        scriptsArray.forEach(script => {
+          const newScript = document.createElement("script");
+          if (script.src) {
+            newScript.src = script.src;
+          } else {
+            newScript.textContent = script.textContent;
+          }
+          document.body.appendChild(newScript);
+        });
 
         // Initialize any necessary event listeners or functionality
         this.initializeTinnitusInterface(type);
